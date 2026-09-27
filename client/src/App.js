@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
@@ -11,6 +11,12 @@ import Calendar from './pages/Calendar'
 import ResetPassword from './pages/ResetPassword'
 import API_URL from './config'
 import Blobs from './components/Blobs'
+
+function RequireSession({ children }) {
+  return localStorage.getItem('accessToken')
+    ? children
+    : <Navigate to="/login" replace />
+}
 
 function App() {
   const [particles, setParticles] = useState([])
@@ -163,13 +169,12 @@ function App() {
         <Route path = "/" element = {<Login />} />
         <Route path = "/login" element = {<Login />} />
         <Route path = "/signup" element = {<Signup />} />
-        <Route path = "/dashboard" element = {<Dashboard />} />
-        <Route path = "/bidding" element = {<Bidding />} />
-        <Route path="/admin" element={<Admin user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} />} />
-          <Route path="/individual" element={<Individual user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} />} />
-          <Route path="/leader" element={<Leader user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} />} />
-          <Route path="/calendar" element={<Calendar />} />
-        <Route path = "/calendar" element = {<Calendar />} />
+        <Route path = "/dashboard" element = {<RequireSession><Dashboard /></RequireSession>} />
+        <Route path = "/bidding" element = {<RequireSession><Bidding /></RequireSession>} />
+        <Route path="/admin" element={<RequireSession><Admin user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} /></RequireSession>} />
+        <Route path="/individual" element={<RequireSession><Individual user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} /></RequireSession>} />
+        <Route path="/leader" element={<RequireSession><Leader user={JSON.parse(localStorage.getItem('user') || '{}')} effectsProps={effectsProps} /></RequireSession>} />
+        <Route path="/calendar" element={<RequireSession><Calendar /></RequireSession>} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </div>

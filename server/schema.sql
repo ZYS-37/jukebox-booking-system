@@ -1,7 +1,7 @@
 -- 保存 schema， 同步数据库结构
 --以下为在mysql里创建的table及其中数据
 -- slot_time stores the starting time of a valid 2-hour booking block.
--- Valid values: 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00.
+-- Valid values: 07:00, 09:00, 11:00, 13:00, 15:00, 17:00, 19:00, 21:00.
 CREATE DATABASE IF NOT EXISTS jukebox;
 USE jukebox;
 

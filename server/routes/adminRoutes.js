@@ -2,6 +2,35 @@ const express = require('express')
 const router = express.Router()
 const db = require('../db')
 const notifications = require('../notifications')
+const { requireAdmin } = require('../middleware/auth')
+
+// Every request reaches this router through requireAuth in index.js. These
+// read-only endpoints are intentionally available to any approved member so
+// calendars and bidding status remain visible. All other admin routes require
+// an approved administrator.
+const memberReadablePaths = new Set([
+  '/holiday-mode',
+  '/bidding-status',
+  '/bookings'
+])
+
+router.use((req, res, next) => {
+  if (req.method === 'GET' && memberReadablePaths.has(req.path)) {
+    return next()
+  }
+
+  return requireAdmin(req, res, next)
+})
+
+// Legacy handlers still read admin_user_id from request bodies. Populate it
+// from the verified token rather than trusting a browser-supplied value.
+router.use((req, res, next) => {
+  if (req.body && req.method !== 'GET') {
+    req.body.admin_user_id = req.user.id
+  }
+
+  next()
+})
 
 
 // avoid toISOString() timezone shifting problems
@@ -1623,9 +1652,6 @@ router.get('/bookings', (req, res) => {
         bookings.status,
         bookings.reject_reason,
         bookings.notes,
-        bookings.humidifier_photo_url,
-        bookings.humidifier_photo_uploaded_at,
-        bookings.humidifier_flagged,
         bookings.created_at
       FROM bookings
       LEFT JOIN bands ON bookings.band_id = bands.id
@@ -1650,6 +1676,12 @@ router.get('/bookings', (req, res) => {
 
 router.post('/remind', (req, res) => {
   const { booking_id, admin_user_id, reason } = req.body
+
+  if (reason === 'flag') {
+    return res.status(410).json({
+      message: 'Humidifier photo reminders are temporarily unavailable.'
+    })
+  }
 
   if (!booking_id) {
     return res.status(400).json({ message: 'booking_id is required.' })

@@ -10,15 +10,26 @@ const {
     deleteUploadedFile
 } = require('../humidifierUpload')
 
+function humidifierFeatureDisabled(req, res) {
+  return res.status(410).json({
+    message: 'Humidifier photo uploads are temporarily unavailable.'
+  })
+}
+
+// Keep the legacy handlers below unreachable until durable object storage is
+// implemented. This prevents new files from being written to the service disk.
+router.post('/delete-humidifier-photo', humidifierFeatureDisabled)
+router.post('/upload-humidifier-photo', humidifierFeatureDisabled)
+
 const validSlotTimes = [
-  '08:00',
-  '10:00',
-  '12:00',
-  '14:00',
-  '16:00',
-  '18:00',
-  '20:00',
-  '22:00'
+  '07:00',
+  '09:00',
+  '11:00',
+  '13:00',
+  '15:00',
+  '17:00',
+  '19:00',
+  '21:00'
 ]
 // sync front end slot labels with mysql time format
 function normalizeSlotTime(slotTime) {
@@ -29,32 +40,32 @@ function normalizeSlotTime(slotTime) {
   const cleanedSlotTime = String(slotTime).trim().toLowerCase()
 
   const slotTimeMap = {
-    '8:00am - 10:00am': '08:00',
-    '10:00am - 12:00pm': '10:00',
-    '12:00pm - 2:00pm': '12:00',
-    '2:00pm - 4:00pm': '14:00',
-    '4:00pm - 6:00pm': '16:00',
-    '6:00pm - 8:00pm': '18:00',
-    '8:00pm - 10:00pm': '20:00',
-    '10:00pm - 12:00am': '22:00',
+    '7:00am - 9:00am': '07:00',
+    '9:00am - 11:00am': '09:00',
+    '11:00am - 1:00pm': '11:00',
+    '1:00pm - 3:00pm': '13:00',
+    '3:00pm - 5:00pm': '15:00',
+    '5:00pm - 7:00pm': '17:00',
+    '7:00pm - 9:00pm': '19:00',
+    '9:00pm - 11:00pm': '21:00',
 
-    '08:00': '08:00',
-    '10:00': '10:00',
-    '12:00': '12:00',
-    '14:00': '14:00',
-    '16:00': '16:00',
-    '18:00': '18:00',
-    '20:00': '20:00',
-    '22:00': '22:00',
+    '07:00': '07:00',
+    '09:00': '09:00',
+    '11:00': '11:00',
+    '13:00': '13:00',
+    '15:00': '15:00',
+    '17:00': '17:00',
+    '19:00': '19:00',
+    '21:00': '21:00',
 
-    '08:00:00': '08:00',
-    '10:00:00': '10:00',
-    '12:00:00': '12:00',
-    '14:00:00': '14:00',
-    '16:00:00': '16:00',
-    '18:00:00': '18:00',
-    '20:00:00': '20:00',
-    '22:00:00': '22:00'
+    '07:00:00': '07:00',
+    '09:00:00': '09:00',
+    '11:00:00': '11:00',
+    '13:00:00': '13:00',
+    '15:00:00': '15:00',
+    '17:00:00': '17:00',
+    '19:00:00': '19:00',
+    '21:00:00': '21:00'
   }
 
   return slotTimeMap[cleanedSlotTime] || null
@@ -550,9 +561,6 @@ router.get('/view-my-bookings', (req, res) => {
             slot_time,
             status,
             notes,
-            humidifier_photo_url,
-            humidifier_photo_uploaded_at,
-            humidifier_flagged,
             cancel_reason,
             cancelled_at,
             is_late_cancellation,

@@ -9,7 +9,6 @@ import SlotGrid from '../components/Slotgrid'
 import { getWeekDates, getBookingDateStr, getDateStr } from '../components/dateutils'
 import { biddingSlotStyles, biddingLegendItems, DAYS, TIMES, TIME_VALS, TIME_SLOTS } from '../components/calendarstyle'
 import SettingsTab from '../components/SettingsTab'
-import HumidifierTab, { useShowHumidifierTab } from '../components/HumidifierTab'
 
 function Admin({ user, effectsProps }) {
   const navigate = useNavigate()
@@ -53,7 +52,6 @@ function Admin({ user, effectsProps }) {
 
   const weekDates = getWeekDates(weekOffset)
   const bookingsWeekDates = getWeekDates(bookingsWeekOffset)
-  const showHumidifier = useShowHumidifierTab(user.id, 'admin') 
 
   function getNextBiddingWeekMonday() {
     const now = new Date()
@@ -515,10 +513,11 @@ function Admin({ user, effectsProps }) {
 
   function handleLogout() {
     localStorage.removeItem('user')
+    localStorage.removeItem('accessToken')
     navigate('/login')
   }
   const isAdminLeader = myBands.some(b => b.is_leader || b.member_role === 'leader')
-  const tabs = ['overview', 'bookings', ...(holidayMode ? [] : ['bidding']), 'users', 'my booking', ...(isAdminLeader ? ['my bands'] : []), ...(showHumidifier ? ['humidifier'] : []), 'settings']
+  const tabs = ['overview', 'bookings', ...(holidayMode ? [] : ['bidding']), 'users', 'my booking', ...(isAdminLeader ? ['my bands'] : []), 'settings']
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-navy opacity-50 text-sm">Loading...</p>
@@ -1724,10 +1723,6 @@ function Admin({ user, effectsProps }) {
               </div>
             )
           })()}
-
-          {activeTab === 'humidifier' && (
-            <HumidifierTab userId={user.id} userRole="admin" myBands={[]} />
-          )}
 
           {/* ===== SETTINGS ===== */}
           {activeTab === 'settings' && (

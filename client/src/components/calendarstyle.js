@@ -17,19 +17,19 @@ export const legendItems = [
 ]
 
 export const TIME_SLOTS = [
-  { label: '8:00am', value: '08:00' },
-  { label: '10:00am', value: '10:00' },
-  { label: '12:00pm', value: '12:00' },
-  { label: '2:00pm', value: '14:00' },
-  { label: '4:00pm', value: '16:00' },
-  { label: '6:00pm', value: '18:00' },
-  { label: '8:00pm', value: '20:00' },
-  { label: '10:00pm', value: '22:00' },
+  { label: '7:00am', value: '07:00' },
+  { label: '9:00am', value: '09:00' },
+  { label: '11:00am', value: '11:00' },
+  { label: '1:00pm', value: '13:00' },
+  { label: '3:00pm', value: '15:00' },
+  { label: '5:00pm', value: '17:00' },
+  { label: '7:00pm', value: '19:00' },
+  { label: '9:00pm', value: '21:00' },
 ]
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-export const TIMES = ['8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm']
-export const TIME_VALS = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
+export const TIMES = ['7am', '9am', '11am', '1pm', '3pm', '5pm', '7pm', '9pm']
+export const TIME_VALS = ['07:00', '09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00']
 
 export const biddingSlotStyles = {
   available: 'bg-[#d4edda] border border-[#a8d5b5] cursor-pointer hover:opacity-70',

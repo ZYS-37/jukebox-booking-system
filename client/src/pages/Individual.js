@@ -5,7 +5,6 @@ import Indiv from '../assets/indiv.svg'
 import { Card, Button, Badge, SectionLabel } from '../components/UI'
 import { getBookingDateStr } from '../components/dateutils'
 import SettingsTab from '../components/SettingsTab'
-import HumidifierTab, { useShowHumidifierTab } from '../components/HumidifierTab'
 
 function Individual({ user, effectsProps }) {
   const navigate = useNavigate()
@@ -15,7 +14,6 @@ function Individual({ user, effectsProps }) {
   const [bandBookings, setBandBookings] = useState([])
   const [me, setMe] = useState(user)
   const [loading, setLoading] = useState(true)
-  const showHumidifier = useShowHumidifierTab(user.id, 'individual')
 
   useEffect(() => {
     function refreshMe() {
@@ -65,6 +63,7 @@ function Individual({ user, effectsProps }) {
 
   function handleLogout() {
     localStorage.removeItem('user')
+    localStorage.removeItem('accessToken')
     navigate('/login')
   }
 
@@ -118,7 +117,7 @@ function Individual({ user, effectsProps }) {
 
         {/* tab bar */}
         <div className="flex bg-cream border border-beige rounded-2xl p-1 mb-6">
-          {['home', ...(showHumidifier ? ['humidifier'] : []), 'settings'].map(tab => (
+          {['home', 'settings'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -228,10 +227,6 @@ function Individual({ user, effectsProps }) {
             onLogout={handleLogout}
             onUsernameChange={newName => setMe(prev => ({ ...prev, username: newName }))}
           />
-        )}
-
-        {activeTab === 'humidifier' && (
-          <HumidifierTab userId={user.id} userRole="individual" myBands={myBands} />
         )}
 
           </div>

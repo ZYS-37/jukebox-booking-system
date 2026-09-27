@@ -98,9 +98,13 @@ function Login() {
         } else if (data.error) {
           setError(data.error)
           triggerShake()
-        } else {
-          localStorage.setItem('user', JSON.stringify(data))
+        } else if (data.token && data.user) {
+          localStorage.setItem('accessToken', data.token)
+          localStorage.setItem('user', JSON.stringify(data.user))
           navigate('/dashboard')
+        } else {
+          setError('Unable to start a secure session. Please try again.')
+          triggerShake()
         }
       })
       .catch(() => {

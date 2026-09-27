@@ -37,9 +37,6 @@ if (process.env.ENABLE_TELEGRAMBOT === 'true') {
   cron.schedule('0 20 * * *', () => { notifications.notifyDayBeforeReminder() })
   cron.schedule('0 12 * * 4', () => { notifications.notifyAdminRunAllocation() })
 
-  cron.schedule('0 8,10,12,14,16,18,20,22 * * *', () => {
-    notifications.notifyLastUserDehumidifier()
-  })
 }
 
 cron.schedule('*/10 * * * *', () => {

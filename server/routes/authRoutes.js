@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const db = require('../db')
 const bcrypt = require('bcryptjs')
+const { createAccessToken, requireAuth } = require('../middleware/auth')
 
 
 const crypto = require('crypto')
@@ -19,6 +20,19 @@ function hashOtp(otp) {
 // password hash helper function
 function isBcryptHash(value) {
   return typeof value === 'string' && value.startsWith('$2')
+}
+
+function toPublicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    is_mr_certified: user.is_mr_certified,
+    band_id: user.band_id,
+    telegram_chat_id: user.telegram_chat_id
+  }
 }
 /*
 // POST /api/auth/register
@@ -167,10 +181,18 @@ router.post('/login', (req, res) => {
       })
     }
 
-    // Never send password back to frontend
-    delete user.password
+    let token
+    try {
+      token = createAccessToken(user.id)
+    } catch (tokenError) {
+      console.error(tokenError)
+      return res.status(500).json({ error: 'Server authentication is not configured.' })
+    }
 
-    res.json(user)
+    res.json({
+      token,
+      user: toPublicUser(user)
+    })
   })
 })
 
@@ -196,10 +218,8 @@ router.post('/bump-admin', (req, res) => {
   })
 })
 
-router.post('/unlink-telegram', (req, res) => {
-  const { user_id } = req.body
-  if (!user_id) return res.status(400).json({ message: 'user_id is required.' })
-  db.query('UPDATE users SET telegram_chat_id = NULL WHERE id = ?', [user_id], (err) => {
+router.post('/unlink-telegram', requireAuth, (req, res) => {
+  db.query('UPDATE users SET telegram_chat_id = NULL WHERE id = ?', [req.user.id], (err) => {
     if (err) return res.status(500).json({ message: 'Failed to unlink Telegram.' })
     res.json({ message: 'Telegram unlinked successfully.' })
   })
@@ -333,7 +353,6 @@ router.post('/verify-otp', (req, res) => {
 
 // POST /api/auth/request-reset-otp
 router.post('/request-reset-otp', (req, res) => {
-  console.log('request-reset-otp hit', req.body)
   const email = (req.body.email || '').trim().toLowerCase()
 
   if (!nusEmailRegex.test(email)) {
@@ -519,16 +538,8 @@ router.post('/reset-password', (req, res) => {
     }
   )
 })
-router.get('/me', (req, res) => {
-  const { user_id } = req.query
-  if (!user_id) return res.status(400).json({ message: 'user_id required' })
-  db.query('SELECT * FROM users WHERE id = ?', [user_id], (err, results) => {
-    if (err) return res.status(500).json({ message: 'DB error' })
-    if (results.length === 0) return res.status(404).json({ message: 'User not found' })
-    const user = results[0]
-    delete user.password
-    res.json(user)
-  })
+router.get('/me', requireAuth, (req, res) => {
+  res.json(toPublicUser(req.user))
 })
 
 module.exports = router
