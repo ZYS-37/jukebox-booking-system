@@ -8,9 +8,27 @@ This application is deployed as two services:
 | Express API | Render | `server` | Authentication, bookings, bidding, MySQL, integrations and scheduled jobs |
 | MySQL database | Managed MySQL provider | External | Persistent application data |
 
-Deploy the API first, then point the Vercel app at its public URL.
+Create the database first, deploy the API second, then point the Vercel app at its public URL.
 
-## 1. Prepare production values
+## 1. Create the Aiven MySQL service
+
+1. Create an **Aiven for MySQL** service. Use the Free plan for initial testing or the Developer plan for a small always-on deployment.
+2. In the service's **Overview** page, copy the host, port, user, password and database name from **Connection information**.
+3. Download the project **CA Certificate** from the same page. Aiven uses this certificate to verify MySQL connections.
+4. In Aiven's **Databases** section, create a database named `jukebox` (or use the provided default database and set `DB_NAME` to it).
+5. In **Users**, create an application user with a strong password. Use this user—not an administrative account—for Render.
+
+To put the CA safely in Render, encode the downloaded `ca.pem` into one line locally, then copy the output:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\ca.pem'))
+```
+
+The server supports this value through `DB_SSL_CA_BASE64` and verifies the certificate by default. Do not disable certificate verification in production.
+
+If this is a brand-new database, import [`server/schema.sql`](server/schema.sql) using MySQL Workbench or the `mysql` client before deploying the API. If migrating an existing database, create a backup and use Aiven's migration/import workflow instead.
+
+## 2. Prepare production values
 
 Before deploying, collect the production MySQL connection values and choose a strong random `JWT_SECRET` (at least 32 random bytes). Do not commit these values to Git.
 
@@ -27,6 +45,9 @@ DB_PORT=3306
 DB_USER=...
 DB_PASSWORD=...
 DB_NAME=jukebox
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=true
+DB_SSL_CA_BASE64=the-single-line-base64-value-from-ca.pem
 
 EMAIL_DEV_MODE=false
 RESEND_API_KEY=...
@@ -39,7 +60,7 @@ RUN_AUTO_RELEASE_ON_START=false
 
 Keep the optional Google Calendar, Telegram and scheduled-job flags off until the core booking flow has been tested. If you enable an integration later, add its corresponding credentials from the example file. Humidifier-photo uploads are intentionally disabled in the current build.
 
-## 2. Deploy the API to Render
+## 3. Deploy the API to Render
 
 1. Push the project to a Git provider and create a new **Web Service** in Render.
 2. Connect the repository and set **Root Directory** to `server`.
@@ -55,7 +76,7 @@ https://YOUR-RENDER-SERVICE.onrender.com/api/health
 
 It should return a JSON health response. Do not test protected booking endpoints until a user has logged in and received a fresh session.
 
-## 3. Deploy the client to Vercel
+## 4. Deploy the client to Vercel
 
 1. Import the same repository into Vercel.
 2. Set **Root Directory** to `client`. Vercel should detect Create React App.
@@ -70,7 +91,7 @@ It should return a JSON health response. Do not test protected booking endpoints
 
 If you add a custom domain, add that exact `https://` origin to `CLIENT_ORIGINS` as well. For multiple approved frontend origins, use a comma-separated list.
 
-## 4. Smoke-test the production deployment
+## 5. Smoke-test the production deployment
 
 After both deployments are live:
 
@@ -83,7 +104,7 @@ After both deployments are live:
 
 Keep `ENABLE_SCHEDULE_JOBS=false` during this first test to avoid background actions while validating the deployment.
 
-## 5. Migrate existing future bookings
+## 6. Migrate existing future bookings
 
 New requests use the new schedule immediately. Existing records are **not** changed by deployment. After the smoke tests pass:
 
@@ -96,7 +117,7 @@ New requests use the new schedule immediately. Existing records are **not** chan
 
 Do not run this migration before the deployed application has passed the smoke tests. It changes production booking times and should only be run once.
 
-## 6. Ongoing deployment workflow
+## 7. Ongoing deployment workflow
 
 - Deploy the API before frontend changes that depend on new API behavior.
 - For each frontend deployment, Vercel embeds `REACT_APP_API_URL` at build time; redeploy when it changes.
