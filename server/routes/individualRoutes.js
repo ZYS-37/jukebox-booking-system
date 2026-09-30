@@ -31,7 +31,7 @@ const validSlotTimes = [
   '19:00',
   '21:00'
 ]
-// sync front end slot labels with mysql time format
+// Sync frontend slot labels with the database TIME format.
 function normalizeSlotTime(slotTime) {
   if (!slotTime) {
     return null
@@ -92,7 +92,7 @@ function formatLocalDate(date) {
     return `${year}-${month}-${day}`
 }
 
-function parseMysqlDateOnly(dateValue) {
+function parseDateOnly(dateValue) {
     if (dateValue instanceof Date) {
         return new Date(
             dateValue.getFullYear(),
@@ -108,7 +108,7 @@ function parseMysqlDateOnly(dateValue) {
 }
 
 function buildSlotDateTime(slotDate, slotTime) {
-    const dateObj = parseMysqlDateOnly(slotDate)
+    const dateObj = parseDateOnly(slotDate)
     const dateString = formatLocalDate(dateObj)
     const timeString = String(slotTime).slice(0, 5)
 
@@ -116,7 +116,7 @@ function buildSlotDateTime(slotDate, slotTime) {
 }
 
 function getWeekRange(slotDate) {
-    const targetDate = parseMysqlDateOnly(slotDate)
+    const targetDate = parseDateOnly(slotDate)
 
     const day = targetDate.getDay()
     const daysSinceMonday = (day + 6) % 7
@@ -132,7 +132,7 @@ function getWeekRange(slotDate) {
     return { weekMonday, weekSunday }
 }
 
-function toMysqlDate(dateObj) {
+function toDatabaseDate(dateObj) {
     return formatLocalDate(dateObj)
 }
 
@@ -311,8 +311,8 @@ router.post('/book', (req, res) => {
             primarySql,
             [
                 user_id,
-                toMysqlDate(weekMonday),
-                toMysqlDate(weekSunday)
+                toDatabaseDate(weekMonday),
+                toDatabaseDate(weekSunday)
             ],
             (primaryErr, primaryResults) => {
                 if (primaryErr) {
@@ -541,7 +541,7 @@ router.post('/book', (req, res) => {
 // No.2
 //GET  /api/individual/view-my-bookings
 // individual user views their own self-practice bookings
-// phase 1 , directly book, directly insert in mysql and make status == confirmed
+// Phase 1: book directly and create a confirmed database record.
 router.get('/view-my-bookings', (req, res) => {
     const { user_id } = req.query
 

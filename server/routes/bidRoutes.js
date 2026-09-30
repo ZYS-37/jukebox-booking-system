@@ -3,7 +3,7 @@ const router = express.Router()
 const db = require('../db')
 
 // helper function to sync with frontend slots
-// Convert a frontend slot label into the backend/MySQL start time.
+// Convert a frontend slot label into the backend database start time.
 function normalizeSlotTime(slotTime) {
    if (!slotTime) {
       return null
@@ -81,8 +81,8 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`
 }
 
-// Parse MySQL DATE safely, no timezone shift problem
-function parseMysqlDateOnly(dateValue) {
+// Parse a database DATE safely without a timezone shift.
+function parseDateOnly(dateValue) {
   if (dateValue instanceof Date) {
     return new Date(
       dateValue.getFullYear(),
@@ -99,7 +99,7 @@ function parseMysqlDateOnly(dateValue) {
 
 // helper function checking whether the 3 submitted slots are of the same week
 function getWeekRange(slotDate) {
-  const targetDate = parseMysqlDateOnly(slotDate)
+  const targetDate = parseDateOnly(slotDate)
 
   const day = targetDate.getDay()
   const daysSinceMonday = (day + 6) % 7
@@ -115,8 +115,8 @@ function getWeekRange(slotDate) {
   return { weekMonday, weekSunday }
 }
 
-// transform to mysql date format
-function toMysqlDate(dateObj) {
+// Transform to the database DATE format.
+function toDatabaseDate(dateObj) {
   return formatLocalDate(dateObj)
 }
 
@@ -169,7 +169,7 @@ router.post('/weekly', (req, res) => {
       })
     }
 
-    const slotDate = parseMysqlDateOnly(slot_date)
+    const slotDate = parseDateOnly(slot_date)
 
     if (Number.isNaN(slotDate.getTime())) {
       return res.status(400).json({
@@ -234,11 +234,11 @@ router.post('/weekly', (req, res) => {
 
   // check all 3 bids are for the same target week
   const firstWeek = getWeekRange(bids[0].slot_date)
-  const firstWeekMonday = toMysqlDate(firstWeek.weekMonday)
+  const firstWeekMonday = toDatabaseDate(firstWeek.weekMonday)
 
   for (const bid of bids) {
     const currentWeek = getWeekRange(bid.slot_date)
-    const currentWeekMonday = toMysqlDate(currentWeek.weekMonday)
+    const currentWeekMonday = toDatabaseDate(currentWeek.weekMonday)
 
     if (currentWeekMonday !== firstWeekMonday) {
       return res.status(400).json({
@@ -248,7 +248,7 @@ router.post('/weekly', (req, res) => {
   }
 
   const { weekMonday, weekSunday } = getWeekRange(bids[0].slot_date)
-  const targetWeekMonday = toMysqlDate(weekMonday)
+  const targetWeekMonday = toDatabaseDate(weekMonday)
 
   // only the band leader can submit or edit weekly bids
   const leaderSql = `
@@ -309,8 +309,8 @@ router.post('/weekly', (req, res) => {
         existingWeeklySql,
         [
           band_id,
-          toMysqlDate(weekMonday),
-          toMysqlDate(weekSunday)
+          toDatabaseDate(weekMonday),
+          toDatabaseDate(weekSunday)
         ],
         (existingErr, existingBids) => {
           if (existingErr) {
@@ -378,8 +378,8 @@ router.post('/weekly', (req, res) => {
               confirmedBookingSql,
               [
                 band_id,
-                toMysqlDate(weekMonday),
-                toMysqlDate(weekSunday)
+                toDatabaseDate(weekMonday),
+                toDatabaseDate(weekSunday)
               ],
               (bookingErr, confirmedBookings) => {
                 if (bookingErr) {
@@ -405,8 +405,8 @@ router.post('/weekly', (req, res) => {
                   deleteSql,
                   [
                     band_id,
-                    toMysqlDate(weekMonday),
-                    toMysqlDate(weekSunday)
+                    toDatabaseDate(weekMonday),
+                    toDatabaseDate(weekSunday)
                   ],
                   (deleteErr) => {
                     if (deleteErr) {

@@ -42,7 +42,7 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`
 }
 
-function parseMysqlDateOnly(dateValue) {
+function parseDateOnly(dateValue) {
   if (dateValue instanceof Date) {
     return new Date(
       dateValue.getFullYear(),
@@ -58,7 +58,7 @@ function parseMysqlDateOnly(dateValue) {
 }
 
 function getWeekRange(slotDate) {
-  const targetDate = parseMysqlDateOnly(slotDate)
+  const targetDate = parseDateOnly(slotDate)
 
   // getDay(): Sunday = 0, Monday = 1...
   const day = targetDate.getDay()
@@ -75,13 +75,13 @@ function getWeekRange(slotDate) {
   return { weekMonday, weekSunday }
 }
 
-function toMysqlDate(dateObj) {
+function toDatabaseDate(dateObj) {
   return formatLocalDate(dateObj)
 }
 // Get target week Monday from either target_week_monday or slot_date
 function getTargetWeekMondayFromInput(input) {
   if (input.target_week_monday) {
-    const parsed = parseMysqlDateOnly(input.target_week_monday)
+    const parsed = parseDateOnly(input.target_week_monday)
 
     if (Number.isNaN(parsed.getTime())) {
       return null
@@ -91,14 +91,14 @@ function getTargetWeekMondayFromInput(input) {
   }
 
   if (input.slot_date) {
-    const parsed = parseMysqlDateOnly(input.slot_date)
+    const parsed = parseDateOnly(input.slot_date)
 
     if (Number.isNaN(parsed.getTime())) {
       return null
     }
 
     const { weekMonday } = getWeekRange(input.slot_date)
-    return toMysqlDate(weekMonday)
+    return toDatabaseDate(weekMonday)
   }
 
   return null
@@ -106,7 +106,7 @@ function getTargetWeekMondayFromInput(input) {
 
 // Bidding deadline = Thursday 12:00 PM before target week
 function getBiddingDeadlineFromWeekMonday(targetWeekMonday) {
-  const weekMonday = parseMysqlDateOnly(targetWeekMonday)
+  const weekMonday = parseDateOnly(targetWeekMonday)
 
   const deadline = new Date(weekMonday)
   deadline.setDate(weekMonday.getDate() - 4)
@@ -340,8 +340,8 @@ router.post('/set-holiday-mode', (req, res) => {
       INSERT INTO system_settings
       (setting_key, setting_value)
       VALUES ('holiday_mode', ?)
-      ON DUPLICATE KEY UPDATE
-        setting_value = VALUES(setting_value),
+      ON CONFLICT (setting_key) DO UPDATE SET
+        setting_value = EXCLUDED.setting_value,
         updated_at = CURRENT_TIMESTAMP
     `
 
@@ -435,7 +435,7 @@ router.post('/open-bidding', (req, res) => {
       closed_at
     )
     VALUES (?, 'open', CURRENT_TIMESTAMP, NULL)
-    ON DUPLICATE KEY UPDATE
+    ON CONFLICT (target_week_monday) DO UPDATE SET
       status = 'open',
       opened_at = CURRENT_TIMESTAMP,
       closed_at = NULL
@@ -485,7 +485,7 @@ router.post('/delete-booking', (req, res) => {
       db.query(updateSql, [booking_id], (updateErr) => {
         if (updateErr) return res.status(500).json({ message: 'Failed to cancel booking.' })
 
-        const { deleteBookingEvent } = require('./calendarService')
+        const { deleteBookingEvent } = require('../calendarService')
         deleteBookingEvent(booking_id, () => { })
 
         res.json({ message: 'Booking cancelled successfully.', booking_id })
@@ -514,7 +514,7 @@ router.post('/close-bidding', (req, res) => {
       closed_at
     )
     VALUES (?, 'closed', NULL, CURRENT_TIMESTAMP)
-    ON DUPLICATE KEY UPDATE
+    ON CONFLICT (target_week_monday) DO UPDATE SET
       status = 'closed',
       closed_at = CURRENT_TIMESTAMP
   `
@@ -595,7 +595,7 @@ router.post('/run-allocation', (req, res) => {
       return `${year}-${month}-${day}`
     }
 
-    function parseMysqlDateOnly(dateValue) {
+    function parseDateOnlyForAllocation(dateValue) {
       if (dateValue instanceof Date) {
         return new Date(
           dateValue.getFullYear(),
@@ -612,12 +612,12 @@ router.post('/run-allocation', (req, res) => {
 
 
     function toDateString(dateValue) {
-      return formatLocalDate(parseMysqlDateOnly(dateValue))
+      return formatLocalDate(parseDateOnlyForAllocation(dateValue))
     }
 
 
     function getWeekMondayString(dateValue) {
-      const date = parseMysqlDateOnly(dateValue)
+      const date = parseDateOnlyForAllocation(dateValue)
 
       // getDay(): Sunday = 0, Monday = 1...
       const day = date.getDay()
@@ -963,7 +963,7 @@ router.post('/create-band', (req, res) => {
             INSERT INTO band_members
             (band_id, user_id, member_role)
             VALUES (?, ?, 'leader')
-            ON DUPLICATE KEY UPDATE
+            ON CONFLICT (band_id, user_id) DO UPDATE SET
               member_role = 'leader'
           `
 
@@ -1237,7 +1237,7 @@ router.post('/delete-band', (req, res) => {
     WHERE band_id = ?
       AND booking_type = 'band'
       AND status = 'confirmed'
-      AND slot_date >= CURDATE()
+      AND slot_date >= CURRENT_DATE
   `
 
   db.query(futureBookingSql, [band_id], (checkErr, futureBookings) => {
@@ -1314,8 +1314,7 @@ router.post('/add-band-member', (req, res) => {
     INSERT INTO band_members
     (band_id, user_id, member_role)
     VALUES (?, ?, 'member')
-    ON DUPLICATE KEY UPDATE
-      member_role = member_role
+    ON CONFLICT (band_id, user_id) DO NOTHING
   `
 
   db.query(sql, [band_id, user_id], (err) => {
@@ -1456,7 +1455,7 @@ router.post('/assign-band-leader', (req, res) => {
           INSERT INTO band_members
           (band_id, user_id, member_role)
           VALUES (?, ?, 'leader')
-          ON DUPLICATE KEY UPDATE
+          ON CONFLICT (band_id, user_id) DO UPDATE SET
             member_role = 'leader'
         `
 
@@ -1514,7 +1513,7 @@ router.post('/confirm-booking', (req, res) => {
     })
   }
 
-  const parsedSlotDate = parseMysqlDateOnly(slot_date)
+  const parsedSlotDate = parseDateOnly(slot_date)
 
   if (Number.isNaN(parsedSlotDate.getTime())) {
     return res.status(400).json({
@@ -1558,8 +1557,8 @@ router.post('/confirm-booking', (req, res) => {
       countSql,
       [
         band_id,
-        toMysqlDate(weekMonday),
-        toMysqlDate(weekSunday)
+        toDatabaseDate(weekMonday),
+        toDatabaseDate(weekSunday)
       ],
       (countErr, countResults) => {
         if (countErr) {
@@ -2369,7 +2368,7 @@ router.post('/reset-allocation', (req, res) => {
           release_reason = 'Reset by admin'
       WHERE booking_type = 'band'
         AND status = 'confirmed'
-        AND slot_date BETWEEN ? AND DATE_ADD(?, INTERVAL 6 DAY)
+        AND slot_date BETWEEN ? AND (?::date + 6)
     `
 
     db.query(cancelSql, [target_week_monday, target_week_monday], (cancelErr) => {
@@ -2381,7 +2380,7 @@ router.post('/reset-allocation', (req, res) => {
             reject_reason_category = NULL,
             reject_reason = NULL,
             allocation_run_at = NULL
-        WHERE slot_date BETWEEN ? AND DATE_ADD(?, INTERVAL 6 DAY)
+        WHERE slot_date BETWEEN ? AND (?::date + 6)
       `
 
       db.query(revertSql, [target_week_monday, target_week_monday], (revertErr) => {

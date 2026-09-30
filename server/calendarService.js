@@ -28,7 +28,7 @@ function formatLocalDate(date) {
 }
 
 
-function parseMysqlDateOnly(dateValue) {
+function parseDateOnly(dateValue) {
   if (dateValue instanceof Date) {
     return new Date(
       dateValue.getFullYear(),
@@ -46,7 +46,7 @@ function parseMysqlDateOnly(dateValue) {
 
 
 function buildSlotDateTime(slotDate, slotTime) {
-  const dateObj = parseMysqlDateOnly(slotDate)
+  const dateObj = parseDateOnly(slotDate)
   const dateString = formatLocalDate(dateObj)
   const timeString = String(slotTime).slice(0, 5)
   return new Date(`${dateString}T${timeString}:00+08:00`)

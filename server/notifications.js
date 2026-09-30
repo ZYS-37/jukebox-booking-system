@@ -40,7 +40,8 @@ function notifyBiddingDeadlineReminder() {
     WHERE u.telegram_chat_id IS NOT NULL
     AND b.id NOT IN (
       SELECT DISTINCT band_id FROM bids
-      WHERE YEARWEEK(slot_date) = YEARWEEK(DATE_ADD(NOW(), INTERVAL 1 WEEK))
+      WHERE date_trunc('week', slot_date::timestamp) =
+            date_trunc('week', CURRENT_TIMESTAMP + INTERVAL '1 week')
     )
   `
   db.query(sql, (err, results) => {
@@ -453,7 +454,8 @@ function notifyPoolSlotAvailable(slotDate, slotTime) {
         SELECT user_id FROM bookings
         WHERE slot_category = 'primary'
           AND status = 'confirmed'
-          AND YEARWEEK(slot_date) = YEARWEEK(?)
+          AND date_trunc('week', slot_date::timestamp) =
+              date_trunc('week', ?::date::timestamp)
           AND user_id IS NOT NULL
       )
   `

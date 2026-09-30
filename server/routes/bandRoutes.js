@@ -148,7 +148,7 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`
 }
 
-function parseMysqlDateOnly(dateValue) {
+function parseDateOnly(dateValue) {
   if (dateValue instanceof Date) {
     return new Date(
       dateValue.getFullYear(),
@@ -576,7 +576,7 @@ router.post('/holiday-book', (req, res) => {
     })
   }
 
-  const parsedSlotDate = parseMysqlDateOnly(slot_date)
+  const parsedSlotDate = parseDateOnly(slot_date)
 
   if (Number.isNaN(parsedSlotDate.getTime())) {
     return res.status(400).json({

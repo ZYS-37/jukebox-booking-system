@@ -1,38 +1,63 @@
 # Deployment guide
 
-This application is deployed as two services:
+The production architecture is:
 
 | Component | Host | Directory | Responsibility |
 | --- | --- | --- | --- |
-| React single-page app | Vercel | `client` | The browser interface |
-| Express API | Render | `server` | Authentication, bookings, bidding, MySQL, integrations and scheduled jobs |
-| MySQL database | Managed MySQL provider | External | Persistent application data |
+| React single-page app | Vercel | `client` | Browser interface |
+| Express API | Render | `server` | Authentication, bookings, bidding and integrations |
+| PostgreSQL database | Supabase | `server/schema.sql` | Persistent application data |
 
-Create the database first, deploy the API second, then point the Vercel app at its public URL.
+The React app never connects directly to Supabase. It calls the Render API, and only the trusted Render service receives the PostgreSQL credentials.
 
-## 1. Create the Aiven MySQL service
+This deployment uses Supabase only as a managed PostgreSQL database. Authentication remains in the Express API, so the frontend does not need a Supabase URL, anon key, service-role key, or Supabase Auth configuration.
 
-1. Create an **Aiven for MySQL** service. Use the Free plan for initial testing or the Developer plan for a small always-on deployment.
-2. In the service's **Overview** page, copy the host, port, user, password and database name from **Connection information**.
-3. Download the project **CA Certificate** from the same page. Aiven uses this certificate to verify MySQL connections.
-4. In Aiven's **Databases** section, create a database named `jukebox` (or use the provided default database and set `DB_NAME` to it).
-5. In **Users**, create an application user with a strong password. Use this user—not an administrative account—for Render.
+## Quick deployment checklist
 
-To put the CA safely in Render, encode the downloaded `ca.pem` into one line locally, then copy the output:
+1. Create a Supabase project and run `server/schema.sql`.
+2. Deploy the `server` directory to Render with the database and application environment variables.
+3. Confirm the API starts and connects to PostgreSQL.
+4. Deploy the `client` directory to Vercel with the Render API URL.
+5. Add the final Vercel origin to Render and redeploy the API.
+6. Sign up the first user and promote it to administrator in Supabase.
+7. Run the end-to-end smoke tests before enabling optional integrations.
 
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\ca.pem'))
+## 1. Create the Supabase database
+
+1. Create a Supabase project and choose a region close to the Render service.
+2. Open **SQL Editor**, paste the complete contents of [`server/schema.sql`](server/schema.sql), and run it once.
+3. Open the project's **Connect** panel and copy the **Session pooler** connection string. Session mode is suitable for the long-running Render server and works over IPv4. Use the exact host and username supplied by Supabase. See [Supabase database connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+4. Replace the password placeholder in the copied URI. Percent-encode reserved password characters such as `@`, `:`, `/`, `?`, `#`, and `%`.
+5. In **Database Settings > SSL Configuration**, download the server root certificate. See [Supabase SSL enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement).
+
+After running the schema, verify its tables in SQL Editor:
+
+```sql
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;
 ```
 
-The server supports this value through `DB_SSL_CA_BASE64` and verifies the certificate by default. Do not disable certificate verification in production.
+The result should include `band_members`, `bands`, `bidding_windows`, `bids`, `bookings`, `email_otps`, `password_reset_otps`, `system_settings`, and `users`.
 
-If this is a brand-new database, import [`server/schema.sql`](server/schema.sql) using MySQL Workbench or the `mysql` client before deploying the API. If migrating an existing database, create a backup and use Aiven's migration/import workflow instead.
+Encode the downloaded certificate into one line for Render:
 
-## 2. Prepare production values
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\prod-supabase.cer'))
+```
 
-Before deploying, collect the production MySQL connection values and choose a strong random `JWT_SECRET` (at least 32 random bytes). Do not commit these values to Git.
+The schema enables Row Level Security without browser-facing policies. This intentionally blocks direct Data API access; the Express server continues to use its trusted PostgreSQL connection.
 
-The full list of supported server variables is in [`server/.env.example`](server/.env.example). For a first safe production deployment, set these on Render:
+## 2. Configure and deploy the Render API
+
+Create a Render **Web Service** connected to this repository:
+
+- Root Directory: `server`
+- Build Command: `npm ci`
+- Start Command: `npm start`
+
+Add these environment variables in Render:
 
 ```text
 NODE_ENV=production
@@ -40,14 +65,11 @@ CLIENT_ORIGINS=https://YOUR-VERCEL-DOMAIN.vercel.app
 JWT_SECRET=your-long-random-secret
 JWT_EXPIRES_IN=1h
 
-DB_HOST=...
-DB_PORT=3306
-DB_USER=...
-DB_PASSWORD=...
-DB_NAME=jukebox
+DATABASE_URL=postgresql://postgres.PROJECT_REF:ENCODED_PASSWORD@POOLER_HOST:5432/postgres
+DB_POOL_MAX=10
 DB_SSL=true
 DB_SSL_REJECT_UNAUTHORIZED=true
-DB_SSL_CA_BASE64=the-single-line-base64-value-from-ca.pem
+DB_SSL_CA_BASE64=the-single-line-base64-certificate
 
 EMAIL_DEV_MODE=false
 RESEND_API_KEY=...
@@ -56,71 +78,101 @@ ENABLE_GOOGLE_CALENDAR=false
 ENABLE_TELEGRAMBOT=false
 ENABLE_SCHEDULE_JOBS=false
 RUN_AUTO_RELEASE_ON_START=false
+APP_BASE_URL=https://YOUR-VERCEL-DOMAIN.vercel.app
 ```
 
-Keep the optional Google Calendar, Telegram and scheduled-job flags off until the core booking flow has been tested. If you enable an integration later, add its corresponding credentials from the example file. Humidifier-photo uploads are intentionally disabled in the current build.
+Generate `JWT_SECRET` from at least 32 random bytes and never commit it. Keep Google Calendar, Telegram and scheduled jobs disabled until the core booking flow passes its smoke tests. Humidifier-photo features are intentionally disabled.
 
-## 3. Deploy the API to Render
-
-1. Push the project to a Git provider and create a new **Web Service** in Render.
-2. Connect the repository and set **Root Directory** to `server`.
-3. Use build command `npm install` and start command `npm start`.
-4. Add the environment variables above in Render's Environment page.
-5. Deploy and copy the service's public HTTPS URL, for example `https://jukebox-api.onrender.com`.
-
-Check the health endpoint in a browser:
+Deploy the service, then check:
 
 ```text
-https://YOUR-RENDER-SERVICE.onrender.com/api/health
+https://YOUR-RENDER-SERVICE.onrender.com/api/ping
 ```
 
-It should return a JSON health response. Do not test protected booking endpoints until a user has logged in and received a fresh session.
+The response should be `{"ok":true}`. Render logs should also contain `Connected to PostgreSQL database.`
 
-## 4. Deploy the client to Vercel
+The ping endpoint only proves that the Express process is responding. The PostgreSQL connection message in the logs is the separate database-readiness check.
+
+## 3. Configure and deploy the Vercel client
 
 1. Import the same repository into Vercel.
-2. Set **Root Directory** to `client`. Vercel should detect Create React App.
-3. Set `REACT_APP_API_URL` to the Render HTTPS URL, without a trailing slash:
+2. Set **Root Directory** to `client`; Vercel should detect Create React App.
+3. Add the environment variable:
 
    ```text
    REACT_APP_API_URL=https://YOUR-RENDER-SERVICE.onrender.com
    ```
 
-4. Deploy. The included `client/vercel.json` rewrites SPA routes to `index.html`.
-5. Copy the Vercel production URL and update Render's `CLIENT_ORIGINS` to that exact origin. Redeploy Render after changing it.
+4. Deploy. The included `client/vercel.json` handles client-side route rewrites.
+5. Copy the final Vercel origin back into Render's `CLIENT_ORIGINS` and `APP_BASE_URL`, then redeploy the API.
 
-If you add a custom domain, add that exact `https://` origin to `CLIENT_ORIGINS` as well. For multiple approved frontend origins, use a comma-separated list.
+For multiple permitted frontend origins, set `CLIENT_ORIGINS` to a comma-separated list of exact origins. Do not include paths or trailing slashes.
 
-## 5. Smoke-test the production deployment
+Vercel creates a separate URL for each preview deployment. Keep production restricted to the production origin unless preview deployments also need API access; if they do, add only the specific preview origins being tested.
 
-After both deployments are live:
+## 4. Bootstrap the first administrator
 
-1. Open the Vercel URL and log in. Existing local/browser sessions must log in again after the JWT change.
-2. Confirm the dashboard and calendar load without browser CORS errors.
-3. Create a test individual booking at 07:00 and a test band bid at 07:00.
-4. Confirm the available slots are `07:00`, `09:00`, `11:00`, `13:00`, `15:00`, `17:00`, `19:00`, and `21:00`.
-5. Confirm a request using the former `08:00` slot is rejected.
-6. If Calendar integration is enabled, verify the resulting event has the expected start and end times.
+There is no production data to migrate. Create the first account through the normal signup flow, then promote it from Supabase SQL Editor:
 
-Keep `ENABLE_SCHEDULE_JOBS=false` during this first test to avoid background actions while validating the deployment.
+```sql
+UPDATE users
+SET role = 'admin',
+    status = 'approved',
+    is_mr_certified = TRUE
+WHERE email = 'YOUR_NUS_EMAIL';
+```
 
-## 6. Migrate existing future bookings
+Verify that the statement updates exactly one row. Log out and log in again so the application loads the new role.
 
-New requests use the new schedule immediately. Existing records are **not** changed by deployment. After the smoke tests pass:
+## 5. Smoke-test the deployment
 
-1. Back up the production database.
-2. Open [`server/migrations/shift_future_slot_times_earlier_one_hour.sql`](server/migrations/shift_future_slot_times_earlier_one_hour.sql).
-3. Replace `YYYY-MM-DD` with the first date whose future bookings should move one hour earlier.
-4. Run the two preview `SELECT` statements against production and review the affected bookings and bids.
-5. Run the transaction once during a maintenance window.
-6. Update or recreate the corresponding existing Google Calendar events, if any. The migration marks affected synced bookings for resynchronization but does not alter Google Calendar directly.
+1. Log in as the bootstrapped administrator.
+2. Create and approve a normal test user.
+3. Create a band and assign an approved leader.
+4. Confirm the calendar exposes `07:00`, `09:00`, `11:00`, `13:00`, `15:00`, `17:00`, `19:00`, and `21:00` starts.
+5. Submit three ranked band bids and run the allocation flow.
+6. Create an individual booking and confirm duplicate confirmed bookings for the same slot are rejected.
+7. Check Render logs for PostgreSQL, CORS, JWT or email errors.
+8. Enable Google Calendar, Telegram and scheduled jobs one integration at a time, testing after each change.
 
-Do not run this migration before the deployed application has passed the smoke tests. It changes production booking times and should only be run once.
+## 6. Run a local preflight
 
-## 7. Ongoing deployment workflow
+Before deploying a revision, validate the API from the `server` directory:
 
-- Deploy the API before frontend changes that depend on new API behavior.
-- For each frontend deployment, Vercel embeds `REACT_APP_API_URL` at build time; redeploy when it changes.
-- For each API deployment, keep `CLIENT_ORIGINS` aligned with active Vercel/custom-domain origins.
-- Watch Render logs after release for database, CORS, JWT, or integration errors.
-- Never store `.env` files, database passwords, API keys, service-account keys, or `JWT_SECRET` in the repository.
+```powershell
+cd server
+npm ci
+npm test
+npm start
+```
+
+Create `server/.env` from `server/.env.example` and supply a development database connection. When connecting locally to the remote Supabase database, use the Session pooler URI and set `DB_SSL=true`. Keep `.env` out of Git.
+
+For a full local test, set the client's `REACT_APP_API_URL` to the local API origin, start the client separately, and exercise signup, login and booking creation.
+
+## 7. Troubleshooting
+
+| Symptom | Likely cause and action |
+| --- | --- |
+| `relation ... does not exist` | The Supabase schema was not run, was run against the wrong project, or failed partway through. Run the complete `server/schema.sql` in that project's SQL Editor and verify the table list above. |
+| `ENOTFOUND`, `ETIMEDOUT`, or no database connection | Copy the exact **Session pooler** URI from Supabase. Do not substitute the direct database host, which may require IPv6. Check that the password is URL-encoded. |
+| Certificate or `unable to verify` error | Download the correct Supabase root certificate again, base64-encode the certificate file without line breaks, and replace `DB_SSL_CA_BASE64`. Keep `DB_SSL=true` and `DB_SSL_REJECT_UNAUTHORIZED=true`. |
+| API ping works but login or signup fails | The web process is healthy but its database or email dependency is not. Check Render for `Connected to PostgreSQL database.` and inspect the request error immediately following the failed action. |
+| Browser reports a CORS error | Set `CLIENT_ORIGINS` to the exact Vercel origin, including `https://` but excluding paths and a trailing slash, then redeploy Render. |
+| Authentication requests fail after deployment | Confirm that `JWT_SECRET` is present and unchanged across Render deployments. Existing sessions become invalid if the secret changes. |
+| Signup email is not received | Check `RESEND_API_KEY`, the email configuration and Render logs. Use development email mode only for deliberate non-production testing. |
+| The application worked previously but all database operations now fail | Check whether the Supabase Free Plan project is paused and resume it from the Supabase dashboard. |
+
+## 8. Free-tier and production considerations
+
+Supabase may pause an inactive Free Plan project. A paused database makes login, bookings and scheduled jobs unavailable until it is resumed. The Free Plan is suitable for development and demonstrations; use a paid plan when the club depends on the system being continuously available. See [Supabase project pausing](https://supabase.com/docs/guides/platform/free-project-pausing).
+
+The fresh Supabase schema already uses the 07:00–23:00 schedule. Do not run the old MySQL time-shift migration.
+
+## 9. Ongoing deployment workflow
+
+- Apply schema changes in a reviewed SQL migration before deploying API code that needs them.
+- Deploy the API before frontend changes that depend on new API behaviour.
+- Redeploy Vercel whenever `REACT_APP_API_URL` changes because Create React App embeds it at build time.
+- Keep `CLIENT_ORIGINS` aligned with every active Vercel or custom-domain origin.
+- Never expose `DATABASE_URL`, the database password, certificate, `JWT_SECRET`, or service credentials in the React client.

@@ -5,7 +5,7 @@ export function getDateStr(date) {
   return `${y}-${m}-${d}`
 }
 
-// bc mysql 默认 utc 需要改成 gmt+8
+// Database timestamps are UTC; display them in GMT+8.
 export function getBookingDateStr(slotDate) {
   const bookingDate = new Date(new Date(slotDate).getTime() + 8 * 60 * 60 * 1000)
   return getDateStr(bookingDate)

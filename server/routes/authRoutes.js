@@ -255,9 +255,11 @@ router.post('/request-otp', (req, res) => {
       const upsert = `
         INSERT INTO email_otps (email, otp_hash, expires_at, attempts, created_at)
         VALUES (?, ?, ?, 0, NOW())
-        ON DUPLICATE KEY UPDATE
-          otp_hash = VALUES(otp_hash), expires_at = VALUES(expires_at),
-          attempts = 0, created_at = NOW()
+        ON CONFLICT (email) DO UPDATE SET
+          otp_hash = EXCLUDED.otp_hash,
+          expires_at = EXCLUDED.expires_at,
+          attempts = 0,
+          created_at = CURRENT_TIMESTAMP
       `
       db.query(upsert, [email, otpHash, expiresAt], (err3) => {
         if (err3) return res.status(500).json({ error: err3.message })
@@ -398,11 +400,11 @@ router.post('/request-reset-otp', (req, res) => {
             INSERT INTO password_reset_otps
               (email, otp_hash, expires_at, attempts, created_at)
             VALUES (?, ?, ?, 0, NOW())
-            ON DUPLICATE KEY UPDATE
-              otp_hash = VALUES(otp_hash),
-              expires_at = VALUES(expires_at),
+            ON CONFLICT (email) DO UPDATE SET
+              otp_hash = EXCLUDED.otp_hash,
+              expires_at = EXCLUDED.expires_at,
               attempts = 0,
-              created_at = NOW()
+              created_at = CURRENT_TIMESTAMP
           `
 
           db.query(upsert, [email, otpHash, expiresAt], (err3) => {

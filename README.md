@@ -37,7 +37,7 @@ Userflow diagram
 Features
 Weighted automated bidding allocation system 
 Band practice booking
-Each week the band bidding window will be opened for band bookings first, where band leaders bid on behalf of their bands. There are three types of bands, normal bands, performance bands and ad-hoc/senior bands. Currently, the MR bookings operate in 2 hour blocks from 8am to 12am, giving a total of 8 slots each day. At any point of time if the admin wishes to change the slots to odd intervals (i.e. from 7am to 11pm) he or she can do so using the system. 
+Each week the band bidding window will be opened for band bookings first, where band leaders bid on behalf of their bands. There are three types of bands, normal bands, performance bands and ad-hoc/senior bands. The MR bookings operate in 2-hour blocks from 7am to 11pm, giving a total of 8 slots each day.
 
 For band bookings, the bidding opens as early as desired for any future week, but the band leaders must submit all bids for the following week by Thursday 12pm. Based on the final bids, our system will push the booking results after the deadline. 
 
@@ -85,11 +85,11 @@ During performance days the slots are blocked out as instruments will all be shi
 
 Sample bidding sheet with blocked out events
 
-For tie breaking, an example will be as such. Notice that for Friday, Horses at my homework and The 6and had two ties from 8-10pm and 10pm-12am. 
+For tie breaking, an example will be as such. Notice that for Friday, Horses at my homework and The 6and had two ties from 7-9pm and 9-11pm.
 
 Sample bidding sheet with ties and cascading priority
 
-Since the system resolved the first tie by randomly allocating the 8-10pm slot to Horses ate my homework, by the cascading priority rule for the next tie, The 6and receives priority over Horses ate my homework.
+Since the system resolved the first tie by randomly allocating the 7-9pm slot to Horses ate my homework, by the cascading priority rule for the next tie, The 6and receives priority over Horses ate my homework.
 
 
 Sample outcome sheet resolving ties
@@ -242,14 +242,14 @@ Frontend – React, JavaScript, HTML/CSS
 building the interface, display schedule and results, allow users to submit booking requests
 Backend – Node.js, Express.js, Python
 handle booking logic, implement bidding system, communicate with database, connect to Google Calendar API 
-Database – SQL 
+Database – Supabase PostgreSQL
 store users, booking requests, finalized bookings, bidding data 
 API – Google Calendar API, TelegramBot
 auto push confirmed bookings, synchronise with shared calendar
 Deployment / implementation
 Vercel for front end hosting 
-render for back end hosting 
-mysql
+Render for backend hosting
+Supabase PostgreSQL for the managed database
 
 
 Qualifications
